@@ -8,12 +8,13 @@ import {
   X,
   Check,
   Clock,
-  Shield
+  Shield,
+  Loader2
 } from 'lucide-react';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { Button } from '@/components/ui/button';
-import { Alert } from '@/lib/api';
+import { Alert, api } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface ExtendedAlert extends Alert {
@@ -29,55 +30,27 @@ export const Alerts: React.FC = () => {
 
   useEffect(() => {
     const fetchAlerts = async () => {
+      if (!user?.id) {
+        setIsLoading(false);
+        return;
+      }
+
       setIsLoading(true);
-      await new Promise(resolve => setTimeout(resolve, 800));
-      
-      // Demo alerts
-      const demoAlerts: ExtendedAlert[] = [
-        {
-          id: 1,
-          type: 'LOW_ATTENDANCE',
-          message: 'Your attendance in Machine Learning has dropped below 75%',
-          severity: 'HIGH',
+      try {
+        const data = await api.getAlerts(user.id);
+        const extended: ExtendedAlert[] = data.map((a, i) => ({
+          ...a,
+          id: a.id ?? i,
           read: false,
-          timestamp: '2 hours ago',
-        },
-        {
-          id: 2,
-          type: 'PROXY_DETECTED',
-          message: 'Suspicious activity detected: Multiple face matches in Data Structures class',
-          severity: 'HIGH',
-          read: false,
-          timestamp: '5 hours ago',
-        },
-        {
-          id: 3,
-          type: 'LOW_CONFIDENCE',
-          message: 'Low confidence face detection for student ID: 21CS045',
-          severity: 'MEDIUM',
-          read: true,
-          timestamp: '1 day ago',
-        },
-        {
-          id: 4,
-          type: 'LOW_ATTENDANCE',
-          message: '15 students are at risk of failing attendance requirements',
-          severity: 'MEDIUM',
-          read: true,
-          timestamp: '2 days ago',
-        },
-        {
-          id: 5,
-          type: 'LOW_CONFIDENCE',
-          message: 'System calibration recommended for Camera 2 in Room 301',
-          severity: 'LOW',
-          read: true,
-          timestamp: '3 days ago',
-        },
-      ];
-      
-      setAlerts(demoAlerts);
-      setIsLoading(false);
+          timestamp: a.created_at || 'Just now',
+        }));
+        setAlerts(extended);
+      } catch (err) {
+        console.error('Failed to fetch alerts:', err);
+        setAlerts([]);
+      } finally {
+        setIsLoading(false);
+      }
     };
     fetchAlerts();
   }, [user]);
@@ -120,6 +93,14 @@ export const Alerts: React.FC = () => {
   });
 
   const unreadCount = alerts.filter(a => !a.read).length;
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -210,7 +191,7 @@ export const Alerts: React.FC = () => {
                       <motion.button
                         whileHover={{ scale: 1.1 }}
                         whileTap={{ scale: 0.9 }}
-                        onClick={() => markAsRead(alert.id)}
+                        onClick={() => markAsRead(alert.id!)}
                         className="p-2 rounded-lg hover:bg-secondary transition-colors"
                         title="Mark as read"
                       >
@@ -220,7 +201,7 @@ export const Alerts: React.FC = () => {
                     <motion.button
                       whileHover={{ scale: 1.1 }}
                       whileTap={{ scale: 0.9 }}
-                      onClick={() => dismissAlert(alert.id)}
+                      onClick={() => dismissAlert(alert.id!)}
                       className="p-2 rounded-lg hover:bg-secondary transition-colors"
                       title="Dismiss"
                     >

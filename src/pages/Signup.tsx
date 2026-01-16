@@ -1,51 +1,53 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Eye, EyeOff, GraduationCap, Loader2 } from 'lucide-react';
+import { Eye, EyeOff, GraduationCap, Loader2, UserPlus } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
-import { api, decodeJWT, User } from '@/lib/api';
-import { useAuth } from '@/contexts/AuthContext';
+import { api } from '@/lib/api';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { toast } from 'sonner';
 
-export const LoginPage: React.FC = () => {
+export const SignupPage: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [role, setRole] = useState<string>('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
-  const { login } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
     setError('');
 
+    if (password !== confirmPassword) {
+      setError('Passwords do not match');
+      return;
+    }
+
+    if (!role) {
+      setError('Please select a role');
+      return;
+    }
+
+    setIsLoading(true);
+
     try {
-      const response = await api.login(email, password);
-      
-      // Decode JWT to get user info
-      const decoded = decodeJWT(response.access_token);
-      
-      if (decoded) {
-        const user: User = {
-          id: decoded.user_id,
-          email: decoded.sub,
-          role: decoded.role as 'ADMIN' | 'TEACHER' | 'STUDENT',
-          name: decoded.sub.split('@')[0],
-        };
-        
-        login(response.access_token, user);
-        toast.success('Login successful!');
-        navigate('/dashboard');
-      } else {
-        throw new Error('Invalid token received');
-      }
+      await api.register(email, password, role);
+      toast.success('Registration successful! Please sign in.');
+      navigate('/login');
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Login failed. Please try again.';
+      const message = err instanceof Error ? err.message : 'Registration failed. Please try again.';
       setError(message);
       toast.error(message);
     } finally {
@@ -86,11 +88,11 @@ export const LoginPage: React.FC = () => {
             transition={{ delay: 0.3 }}
             className="text-center mb-8"
           >
-            <h1 className="text-2xl font-bold mb-2">Welcome to AttendAI</h1>
-            <p className="text-muted-foreground">Sign in to your account</p>
+            <h1 className="text-2xl font-bold mb-2">Create Account</h1>
+            <p className="text-muted-foreground">Sign up for AttendAI</p>
           </motion.div>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-5">
             <motion.div
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
@@ -112,6 +114,25 @@ export const LoginPage: React.FC = () => {
             <motion.div
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.45 }}
+              className="space-y-2"
+            >
+              <Label htmlFor="role">Role</Label>
+              <Select value={role} onValueChange={setRole}>
+                <SelectTrigger className="bg-secondary border-border">
+                  <SelectValue placeholder="Select your role" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="STUDENT">Student</SelectItem>
+                  <SelectItem value="TEACHER">Teacher</SelectItem>
+                  <SelectItem value="ADMIN">Admin</SelectItem>
+                </SelectContent>
+              </Select>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.5 }}
               className="space-y-2"
             >
@@ -125,6 +146,7 @@ export const LoginPage: React.FC = () => {
                   onChange={(e) => setPassword(e.target.value)}
                   className="bg-secondary border-border focus:border-primary pr-10"
                   required
+                  minLength={6}
                 />
                 <button
                   type="button"
@@ -134,6 +156,25 @@ export const LoginPage: React.FC = () => {
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.55 }}
+              className="space-y-2"
+            >
+              <Label htmlFor="confirmPassword">Confirm Password</Label>
+              <Input
+                id="confirmPassword"
+                type={showPassword ? 'text' : 'password'}
+                placeholder="••••••••"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                className="bg-secondary border-border focus:border-primary"
+                required
+                minLength={6}
+              />
             </motion.div>
 
             {error && (
@@ -158,8 +199,10 @@ export const LoginPage: React.FC = () => {
               >
                 {isLoading ? (
                   <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                ) : null}
-                {isLoading ? 'Signing in...' : 'Sign In'}
+                ) : (
+                  <UserPlus className="w-4 h-4 mr-2" />
+                )}
+                {isLoading ? 'Creating Account...' : 'Sign Up'}
               </Button>
             </motion.div>
           </form>
@@ -170,9 +213,9 @@ export const LoginPage: React.FC = () => {
             transition={{ delay: 0.7 }}
             className="text-center text-sm text-muted-foreground mt-6"
           >
-            Don't have an account?{' '}
-            <Link to="/signup" className="text-primary hover:underline">
-              Sign Up
+            Already have an account?{' '}
+            <Link to="/login" className="text-primary hover:underline">
+              Sign In
             </Link>
           </motion.p>
         </GlassCard>
