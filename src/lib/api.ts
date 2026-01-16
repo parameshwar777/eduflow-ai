@@ -19,8 +19,6 @@ export interface Subject {
   name: string;
   class: string;
   total_classes: number;
-  class_id?: number;
-  teacher_id?: number;
 }
 
 export interface StudentStats {
@@ -54,7 +52,7 @@ export interface AttendanceResult {
 }
 
 export interface Alert {
-  id: number;
+  id?: number;
   type: 'LOW_ATTENDANCE' | 'PROXY_DETECTED' | 'LOW_CONFIDENCE';
   message: string;
   severity: 'LOW' | 'MEDIUM' | 'HIGH';
@@ -70,258 +68,85 @@ export interface CalendarData {
   [date: string]: 'PRESENT' | 'ABSENT';
 }
 
-export interface Teacher {
-  id: number;
-  name: string;
-  department_id: number;
-  user_id: number;
-}
-
-export interface Student {
-  id: number;
-  name: string;
-  roll_no: string;
-  year: string;
-  branch: string;
-  section: string;
-}
-
-export interface Department {
-  id: number;
-  name: string;
-}
-
-export interface ClassInfo {
-  id: number;
-  year: string;
-  branch: string;
-  section: string;
-  department_id: number;
-}
-
 // API Helper
 const getAuthHeaders = () => {
   const token = localStorage.getItem('access_token');
   return {
-    'Authorization': `Bearer ${token}`,
+    Authorization: `Bearer ${token}`,
     'Content-Type': 'application/json',
+    Accept: 'application/json',
   };
 };
 
-// Helper to handle API errors
-const handleApiError = async (res: Response, fallbackMessage: string) => {
-  if (!res.ok) {
-    let errorMessage = fallbackMessage;
-    try {
-      const errorData = await res.json();
-      if (errorData.detail) {
-        errorMessage = typeof errorData.detail === 'string' 
-          ? errorData.detail 
-          : errorData.detail[0]?.msg || fallbackMessage;
+const buildFetchErrorHint = (url: string) => {
+  const base = `Network error calling ${url}.`;
+  const hint =
+    ' Check VITE_API_URL, backend is running, CORS allows this origin, and avoid HTTPS→HTTP mixed content (use https backend or a tunnel like ngrok).';
+  return base + hint;
+};
+
+const requestJson = async <T>(url: string, init?: RequestInit): Promise<T> => {
+  try {
+    const res = await fetch(url, init);
+    if (!res.ok) {
+      let message = `Request failed (${res.status})`;
+      try {
+        const body = await res.json();
+        if (body?.detail) {
+          message = typeof body.detail === 'string' ? body.detail : body.detail?.[0]?.msg ?? message;
+        } else if (body?.message) {
+          message = body.message;
+        }
+      } catch {
+        // ignore
       }
-    } catch {
-      // Use fallback message if JSON parsing fails
+      throw new Error(message);
     }
-    throw new Error(errorMessage);
+    return (await res.json()) as T;
+  } catch (e) {
+    if (e instanceof TypeError) throw new Error(buildFetchErrorHint(url));
+    throw e;
   }
-  return res.json();
 };
 
-// API Functions
-export const api = {
-  // Auth - Uses query parameters as per PDF
-  login: async (email: string, password: string): Promise<AuthResponse> => {
-    const params = new URLSearchParams({ email, password });
-    const res = await fetch(`${API_BASE_URL}/api/auth/login?${params}`, {
-      method: 'POST',
-      headers: { 'accept': 'application/json' },
-    });
-    return handleApiError(res, 'Login failed');
-  },
-
-  register: async (email: string, password: string, role: string): Promise<{ message: string }> => {
-    const params = new URLSearchParams({ email, password, role });
-    const res = await fetch(`${API_BASE_URL}/api/auth/register?${params}`, {
-      method: 'POST',
-      headers: { 'accept': 'application/json' },
-    });
-    return handleApiError(res, 'Registration failed');
-  },
-
-  // Teachers
-  createTeacher: async (name: string, departmentId: number, userId: number): Promise<string> => {
-    const params = new URLSearchParams({ 
-      name, 
-      department_id: departmentId.toString(), 
-      user_id: userId.toString() 
-    });
-    const res = await fetch(`${API_BASE_URL}/api/teachers/create?${params}`, {
-      method: 'POST',
-      headers: getAuthHeaders(),
-    });
-    return handleApiError(res, 'Failed to create teacher');
-  },
-
-  getTeachers: async (): Promise<Teacher[]> => {
-    const res = await fetch(`${API_BASE_URL}/api/teachers/`, {
-      headers: getAuthHeaders(),
-    });
-    return handleApiError(res, 'Failed to fetch teachers');
-  },
-
-  // Students
-  registerStudent: async (
-    name: string, 
-    rollNo: string, 
-    year: string, 
-    branch: string, 
-    section: string, 
-    image: File
-  ): Promise<string> => {
-    const params = new URLSearchParams({ 
-      name, 
-      roll_no: rollNo, 
-      year, 
-      branch, 
-      section 
-    });
-    
-    const formData = new FormData();
-    formData.append('image', image);
-    
+const requestFormData = async <T>(url: string, formData: FormData): Promise<T> => {
+  try {
     const token = localStorage.getItem('access_token');
-    const res = await fetch(`${API_BASE_URL}/api/students/register?${params}`, {
+    const res = await fetch(url, {
       method: 'POST',
-      headers: { 
-        'Authorization': `Bearer ${token}`,
-        'accept': 'application/json'
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/json',
       },
       body: formData,
     });
-    return handleApiError(res, 'Failed to register student');
-  },
 
-  getStudentStats: async (studentId: number): Promise<StudentStats> => {
-    const res = await fetch(`${API_BASE_URL}/api/students/${studentId}/stats`, {
-      headers: getAuthHeaders(),
-    });
-    return handleApiError(res, 'Failed to fetch stats');
-  },
+    if (!res.ok) {
+      let message = `Request failed (${res.status})`;
+      try {
+        const body = await res.json();
+        if (body?.detail) {
+          message = typeof body.detail === 'string' ? body.detail : body.detail?.[0]?.msg ?? message;
+        } else if (body?.message) {
+          message = body.message;
+        }
+      } catch {
+        // ignore
+      }
+      throw new Error(message);
+    }
 
-  getStudentPrediction: async (studentId: number): Promise<Prediction> => {
-    const res = await fetch(`${API_BASE_URL}/api/students/${studentId}/prediction`, {
-      headers: getAuthHeaders(),
-    });
-    return handleApiError(res, 'Failed to fetch prediction');
-  },
-
-  // Subjects
-  createSubject: async (name: string, classId: number, teacherId: number): Promise<string> => {
-    const params = new URLSearchParams({ 
-      name, 
-      class_id: classId.toString(), 
-      teacher_id: teacherId.toString() 
-    });
-    const res = await fetch(`${API_BASE_URL}/api/subjects/create?${params}`, {
-      method: 'POST',
-      headers: getAuthHeaders(),
-    });
-    return handleApiError(res, 'Failed to create subject');
-  },
-
-  getSubjects: async (): Promise<Subject[]> => {
-    const res = await fetch(`${API_BASE_URL}/api/subjects/`, {
-      headers: getAuthHeaders(),
-    });
-    return handleApiError(res, 'Failed to fetch subjects');
-  },
-
-  getTeacherSubjects: async (teacherId: number): Promise<Subject[]> => {
-    // The PDF shows /api/subjects/ without teacher filter, so we fetch all and filter
-    const res = await fetch(`${API_BASE_URL}/api/subjects/`, {
-      headers: getAuthHeaders(),
-    });
-    const subjects = await handleApiError(res, 'Failed to fetch subjects');
-    // If the API returns teacher-specific subjects, use as is
-    // Otherwise, filter by teacher_id if available
-    return subjects;
-  },
-
-  // Attendance - Core AI API
-  markAttendance: async (subjectId: number, image: File): Promise<AttendanceResult> => {
-    const params = new URLSearchParams({ subject_id: subjectId.toString() });
-    
-    const formData = new FormData();
-    formData.append('image', image);
-    
-    const token = localStorage.getItem('access_token');
-    const res = await fetch(`${API_BASE_URL}/api/attendance/mark?${params}`, {
-      method: 'POST',
-      headers: { 
-        'Authorization': `Bearer ${token}`,
-        'accept': 'application/json'
-      },
-      body: formData,
-    });
-    return handleApiError(res, 'Failed to mark attendance');
-  },
-
-  getAttendanceTrend: async (subjectId: number): Promise<AttendanceTrend> => {
-    const res = await fetch(`${API_BASE_URL}/api/attendance/subject/${subjectId}/trend`, {
-      headers: getAuthHeaders(),
-    });
-    return handleApiError(res, 'Failed to fetch trend');
-  },
-
-  getAttendanceCalendar: async (studentId: number): Promise<CalendarData> => {
-    const res = await fetch(`${API_BASE_URL}/api/attendance/student/${studentId}/calendar`, {
-      headers: getAuthHeaders(),
-    });
-    return handleApiError(res, 'Failed to fetch calendar');
-  },
-
-  // Admin
-  getUniversityStats: async (): Promise<UniversityStats> => {
-    const res = await fetch(`${API_BASE_URL}/api/admin/university-stats`, {
-      headers: getAuthHeaders(),
-    });
-    return handleApiError(res, 'Failed to fetch university stats');
-  },
-
-  createDepartment: async (name: string): Promise<string> => {
-    const params = new URLSearchParams({ name });
-    const res = await fetch(`${API_BASE_URL}/api/admin/departments/create?${params}`, {
-      method: 'POST',
-      headers: getAuthHeaders(),
-    });
-    return handleApiError(res, 'Failed to create department');
-  },
-
-  createClass: async (year: string, branch: string, section: string, departmentId: number): Promise<string> => {
-    const params = new URLSearchParams({ 
-      year, 
-      branch, 
-      section, 
-      department_id: departmentId.toString() 
-    });
-    const res = await fetch(`${API_BASE_URL}/api/admin/classes/create?${params}`, {
-      method: 'POST',
-      headers: getAuthHeaders(),
-    });
-    return handleApiError(res, 'Failed to create class');
-  },
-
-  // Alerts
-  getAlerts: async (userId: number): Promise<Alert[]> => {
-    const res = await fetch(`${API_BASE_URL}/api/alerts/${userId}`, {
-      headers: getAuthHeaders(),
-    });
-    return handleApiError(res, 'Failed to fetch alerts');
-  },
+    return (await res.json()) as T;
+  } catch (e) {
+    if (e instanceof TypeError) throw new Error(buildFetchErrorHint(url));
+    throw e;
+  }
 };
 
-// Decode JWT token
-export const decodeJWT = (token: string): { sub: string; role: string; user_id: number; exp: number } | null => {
+// Decode JWT token payload (no signature verification; backend must enforce auth/roles)
+export const decodeJWT = (
+  token: string
+): { sub?: string; role?: string; user_id?: number; exp?: number } | null => {
   try {
     const base64Url = token.split('.')[1];
     const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
@@ -335,6 +160,120 @@ export const decodeJWT = (token: string): { sub: string; role: string; user_id: 
   } catch {
     return null;
   }
+};
+
+// API Functions
+export const api = {
+  // Auth
+  login: async (email: string, password: string): Promise<AuthResponse> => {
+    return requestJson<AuthResponse>(`${API_BASE_URL}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
+  },
+
+  register: async (email: string, password: string, role: string): Promise<{ message: string }> => {
+    return requestJson<{ message: string }>(`${API_BASE_URL}/api/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ email, password, role }),
+    });
+  },
+
+  // Admin
+  createDepartment: async (name: string): Promise<{ message: string } | string> => {
+    return requestJson(`${API_BASE_URL}/api/admin/departments/create`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ name }),
+    });
+  },
+
+  createClass: async (
+    year: string,
+    branch: string,
+    section: string,
+    department_id: number
+  ): Promise<{ message: string } | string> => {
+    return requestJson(`${API_BASE_URL}/api/admin/classes/create`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ year, branch, section, department_id }),
+    });
+  },
+
+  getUniversityStats: async (): Promise<UniversityStats> => {
+    return requestJson<UniversityStats>(`${API_BASE_URL}/api/admin/university-stats`, {
+      headers: getAuthHeaders(),
+    });
+  },
+
+  // Teacher
+  createTeacher: async (name: string, department_id: number, user_id: number): Promise<{ message: string } | string> => {
+    return requestJson(`${API_BASE_URL}/api/teachers/create`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ name, department_id, user_id }),
+    });
+  },
+
+  getTeacherSubjects: async (teacherId: number): Promise<Subject[]> => {
+    return requestJson<Subject[]>(`${API_BASE_URL}/api/subjects/teacher/${teacherId}`, {
+      headers: getAuthHeaders(),
+    });
+  },
+
+  // Student
+  registerStudent: async (roll_no: string, name: string, class_id: number, image: File): Promise<any> => {
+    const formData = new FormData();
+    formData.append('roll_no', roll_no);
+    formData.append('name', name);
+    formData.append('class_id', String(class_id));
+    formData.append('image', image);
+
+    return requestFormData(`${API_BASE_URL}/api/students/register`, formData);
+  },
+
+  getStudentStats: async (studentId: number): Promise<StudentStats> => {
+    return requestJson<StudentStats>(`${API_BASE_URL}/api/students/${studentId}/stats`, {
+      headers: getAuthHeaders(),
+    });
+  },
+
+  getStudentPrediction: async (studentId: number): Promise<Prediction> => {
+    return requestJson<Prediction>(`${API_BASE_URL}/api/students/${studentId}/prediction`, {
+      headers: getAuthHeaders(),
+    });
+  },
+
+  // Attendance
+  markAttendance: async (subject_id: number, image: File): Promise<AttendanceResult> => {
+    const formData = new FormData();
+    formData.append('subject_id', String(subject_id));
+    formData.append('image', image);
+
+    return requestFormData<AttendanceResult>(`${API_BASE_URL}/api/attendance/mark`, formData);
+  },
+
+  getAttendanceTrend: async (subjectId: number): Promise<AttendanceTrend> => {
+    return requestJson<AttendanceTrend>(`${API_BASE_URL}/api/attendance/subject/${subjectId}/trend`, {
+      headers: getAuthHeaders(),
+    });
+  },
+
+  getAttendanceCalendar: async (studentId: number): Promise<CalendarData> => {
+    return requestJson<CalendarData>(`${API_BASE_URL}/api/attendance/student/${studentId}/calendar`, {
+      headers: getAuthHeaders(),
+    });
+  },
+
+  // Alerts
+  getAlerts: async (userId: number): Promise<Alert[]> => {
+    return requestJson<Alert[]>(`${API_BASE_URL}/api/alerts/${userId}`, {
+      headers: getAuthHeaders(),
+    });
+  },
 };
 
 // Auth helpers
