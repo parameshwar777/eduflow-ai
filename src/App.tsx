@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { LoginPage } from "@/pages/Login";
+import { SignupPage } from "@/pages/Signup";
 import { Dashboard } from "@/pages/Dashboard";
 import { MarkAttendance } from "@/pages/MarkAttendance";
 import { StudentTraining } from "@/pages/StudentTraining";
@@ -25,6 +26,7 @@ const App = () => (
         <BrowserRouter>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/signup" element={<SignupPage />} />
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<DashboardLayout><Dashboard /></DashboardLayout>} />
             <Route path="/attendance/mark" element={<DashboardLayout><MarkAttendance /></DashboardLayout>} />
