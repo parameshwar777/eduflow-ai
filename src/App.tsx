@@ -8,6 +8,7 @@ import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { LoginPage } from "@/pages/Login";
 import { Dashboard } from "@/pages/Dashboard";
 import { MarkAttendance } from "@/pages/MarkAttendance";
+import { StudentTraining } from "@/pages/StudentTraining";
 import { Analytics } from "@/pages/Analytics";
 import { Alerts } from "@/pages/Alerts";
 import { AdminPanel } from "@/pages/AdminPanel";
@@ -27,6 +28,7 @@ const App = () => (
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<DashboardLayout><Dashboard /></DashboardLayout>} />
             <Route path="/attendance/mark" element={<DashboardLayout><MarkAttendance /></DashboardLayout>} />
+            <Route path="/training" element={<DashboardLayout><StudentTraining /></DashboardLayout>} />
             <Route path="/analytics" element={<DashboardLayout><Analytics /></DashboardLayout>} />
             <Route path="/alerts" element={<DashboardLayout><Alerts /></DashboardLayout>} />
             <Route path="/admin/*" element={<DashboardLayout><AdminPanel /></DashboardLayout>} />
