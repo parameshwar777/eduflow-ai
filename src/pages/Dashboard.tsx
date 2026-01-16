@@ -1,12 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { 
-  BookOpen, 
-  Users, 
-  TrendingUp, 
+import {
+  BookOpen,
+  Users,
+  TrendingUp,
   AlertTriangle,
-  Calendar,
-  Clock,
   ChevronRight,
   Loader2
 } from 'lucide-react';
@@ -35,24 +33,24 @@ const TeacherDashboard: React.FC = () => {
 
   useEffect(() => {
     const fetchData = async () => {
+      if (!user?.id) return;
       setIsLoading(true);
       try {
-        const data = await api.getSubjects();
+        const data = await api.getTeacherSubjects(user.id);
         setSubjects(data);
       } catch (error) {
-        const message = error instanceof Error ? error.message : 'Failed to fetch subjects';
-        toast.error(message);
+        toast.error(error instanceof Error ? error.message : 'Failed to fetch subjects');
         setSubjects([]);
       } finally {
         setIsLoading(false);
       }
     };
     fetchData();
-  }, [user]);
+  }, [user?.id]);
 
   const cards: DashboardCard[] = [
     { title: 'Total Subjects', value: subjects.length, icon: BookOpen, color: 'primary' },
-    { title: 'Total Classes', value: subjects.reduce((acc, s) => acc + (s.total_classes || 0), 0), icon: Calendar, color: 'success' },
+    { title: 'Total Classes', value: subjects.reduce((acc, s) => acc + (s.total_classes || 0), 0), icon: TrendingUp, color: 'success' },
   ];
 
   const containerVariants = {
@@ -72,7 +70,6 @@ const TeacherDashboard: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Stats Cards */}
       <motion.div
         variants={containerVariants}
         initial="hidden"
@@ -80,9 +77,7 @@ const TeacherDashboard: React.FC = () => {
         className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"
       >
         {isLoading
-          ? Array.from({ length: 4 }).map((_, i) => (
-              <DashboardCardSkeleton key={i} />
-            ))
+          ? Array.from({ length: 4 }).map((_, i) => <DashboardCardSkeleton key={i} />)
           : cards.map((card) => (
               <motion.div key={card.title} variants={itemVariants}>
                 <GlassCard className="relative overflow-hidden">
@@ -90,35 +85,23 @@ const TeacherDashboard: React.FC = () => {
                     <div className={`p-3 rounded-xl bg-${card.color}/10`}>
                       <card.icon className={`w-6 h-6 text-${card.color}`} />
                     </div>
-                    {card.change && (
-                      <span className="text-xs text-muted-foreground">{card.change}</span>
-                    )}
+                    {card.change && <span className="text-xs text-muted-foreground">{card.change}</span>}
                   </div>
-                  <AnimatedNumber
-                    value={card.value}
-                    suffix={card.suffix}
-                    className="text-3xl font-bold"
-                  />
+                  <AnimatedNumber value={card.value} suffix={card.suffix} className="text-3xl font-bold" />
                   <p className="text-muted-foreground text-sm mt-1">{card.title}</p>
-                  
-                  {/* Glow effect */}
                   <div className={`absolute -right-8 -bottom-8 w-32 h-32 bg-${card.color}/5 rounded-full blur-2xl`} />
                 </GlassCard>
               </motion.div>
             ))}
       </motion.div>
 
-      {/* Subjects List */}
-      <motion.div
-        initial={{ opacity: 0, x: -20 }}
-        animate={{ opacity: 1, x: 0 }}
-        transition={{ delay: 0.4 }}
-      >
+      <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.3 }}>
         <GlassCard hover={false}>
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-lg font-semibold">Your Subjects</h2>
             <StatusBadge status="info" label={`${subjects.length} Active`} />
           </div>
+
           {isLoading ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="w-6 h-6 animate-spin text-primary" />
@@ -126,8 +109,7 @@ const TeacherDashboard: React.FC = () => {
           ) : subjects.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               <BookOpen className="w-12 h-12 mx-auto mb-4 opacity-50" />
-              <p>No subjects found</p>
-              <p className="text-sm">Subjects will appear here once added</p>
+              <p>No subjects found for this teacher</p>
             </div>
           ) : (
             <div className="space-y-3">
@@ -136,7 +118,7 @@ const TeacherDashboard: React.FC = () => {
                   key={subject.subject_id}
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.5 + index * 0.1 }}
+                  transition={{ delay: 0.35 + index * 0.06 }}
                   className="flex items-center justify-between p-4 rounded-lg bg-secondary/50 hover:bg-secondary transition-colors cursor-pointer group"
                 >
                   <div className="flex items-center gap-4">
@@ -145,11 +127,11 @@ const TeacherDashboard: React.FC = () => {
                     </div>
                     <div>
                       <p className="font-medium">{subject.name}</p>
-                      <p className="text-sm text-muted-foreground">{subject.class || 'No class assigned'}</p>
+                      <p className="text-sm text-muted-foreground">{subject.class}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="text-sm text-muted-foreground">{subject.total_classes || 0} classes</span>
+                    <span className="text-sm text-muted-foreground">{subject.total_classes} classes</span>
                     <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
                   </div>
                 </motion.div>
@@ -170,30 +152,34 @@ const StudentDashboard: React.FC = () => {
 
   useEffect(() => {
     const fetchData = async () => {
+      if (!user?.id) return;
       setIsLoading(true);
       try {
         const [statsData, predData] = await Promise.all([
-          api.getStudentStats(user?.id || 1),
-          api.getStudentPrediction(user?.id || 1),
+          api.getStudentStats(user.id),
+          api.getStudentPrediction(user.id),
         ]);
         setStats(statsData);
         setPrediction(predData);
       } catch (error) {
-        const message = error instanceof Error ? error.message : 'Failed to fetch data';
-        toast.error(message);
+        toast.error(error instanceof Error ? error.message : 'Failed to fetch student data');
       } finally {
         setIsLoading(false);
       }
     };
     fetchData();
-  }, [user]);
+  }, [user?.id]);
 
   const getRiskStatus = (level: string): 'safe' | 'warning' | 'critical' => {
     switch (level) {
-      case 'SAFE': return 'safe';
-      case 'WARNING': return 'warning';
-      case 'CRITICAL': return 'critical';
-      default: return 'warning';
+      case 'SAFE':
+        return 'safe';
+      case 'WARNING':
+        return 'warning';
+      case 'CRITICAL':
+        return 'critical';
+      default:
+        return 'warning';
     }
   };
 
@@ -207,12 +193,7 @@ const StudentDashboard: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Hero Section */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="relative"
-      >
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="relative">
         <GlassCard className="p-8" hover={false}>
           <div className="flex flex-col md:flex-row items-center gap-8">
             <CircularProgress value={stats?.percentage || 0} size={180} strokeWidth={12} />
@@ -234,51 +215,7 @@ const StudentDashboard: React.FC = () => {
               )}
             </div>
           </div>
-          
-          {/* Background glow */}
           <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl" />
-        </GlassCard>
-      </motion.div>
-
-      {/* Stats */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2 }}
-        className="grid grid-cols-1 md:grid-cols-3 gap-4"
-      >
-        <GlassCard>
-          <div className="flex items-center gap-4">
-            <div className="p-3 rounded-xl bg-success/10">
-              <TrendingUp className="w-6 h-6 text-success" />
-            </div>
-            <div>
-              <AnimatedNumber value={stats?.attended || 0} className="text-2xl font-bold" />
-              <p className="text-sm text-muted-foreground">Classes Attended</p>
-            </div>
-          </div>
-        </GlassCard>
-        <GlassCard>
-          <div className="flex items-center gap-4">
-            <div className="p-3 rounded-xl bg-destructive/10">
-              <AlertTriangle className="w-6 h-6 text-destructive" />
-            </div>
-            <div>
-              <AnimatedNumber value={stats?.missed || 0} className="text-2xl font-bold" />
-              <p className="text-sm text-muted-foreground">Classes Missed</p>
-            </div>
-          </div>
-        </GlassCard>
-        <GlassCard>
-          <div className="flex items-center gap-4">
-            <div className="p-3 rounded-xl bg-primary/10">
-              <Calendar className="w-6 h-6 text-primary" />
-            </div>
-            <div>
-              <AnimatedNumber value={stats?.total || 0} className="text-2xl font-bold" />
-              <p className="text-sm text-muted-foreground">Total Classes</p>
-            </div>
-          </div>
         </GlassCard>
       </motion.div>
     </div>
@@ -286,68 +223,13 @@ const StudentDashboard: React.FC = () => {
 };
 
 const AdminDashboard: React.FC = () => {
-  const [stats, setStats] = useState({
-    total_students: 0,
-    total_teachers: 0,
-    average_attendance: 0,
-    at_risk_students: 0,
-  });
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchData = async () => {
-      setIsLoading(true);
-      try {
-        const data = await api.getUniversityStats();
-        setStats(data);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : 'Failed to fetch stats';
-        toast.error(message);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetchData();
-  }, []);
-
-  const cards = [
-    { title: 'Total Students', value: stats.total_students, icon: Users, color: 'primary' },
-    { title: 'Total Teachers', value: stats.total_teachers, icon: BookOpen, color: 'success' },
-    { title: 'Avg Attendance', value: stats.average_attendance, suffix: '%', icon: TrendingUp, color: 'success' },
-    { title: 'At-Risk Students', value: stats.at_risk_students, icon: AlertTriangle, color: 'warning' },
-  ];
-
   return (
-    <div className="space-y-6">
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"
-      >
-        {isLoading
-          ? Array.from({ length: 4 }).map((_, i) => <DashboardCardSkeleton key={i} />)
-          : cards.map((card, index) => (
-              <motion.div
-                key={card.title}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.1 }}
-              >
-                <GlassCard>
-                  <div className="flex items-center gap-4">
-                    <div className={`p-3 rounded-xl bg-${card.color}/10`}>
-                      <card.icon className={`w-6 h-6 text-${card.color}`} />
-                    </div>
-                    <div>
-                      <AnimatedNumber value={card.value} suffix={card.suffix} className="text-2xl font-bold" />
-                      <p className="text-sm text-muted-foreground">{card.title}</p>
-                    </div>
-                  </div>
-                </GlassCard>
-              </motion.div>
-            ))}
-      </motion.div>
-    </div>
+    <GlassCard hover={false}>
+      <div className="flex items-center gap-3">
+        <AlertTriangle className="w-5 h-5 text-warning" />
+        <p className="text-sm text-muted-foreground">Admin dashboard uses /api/admin/university-stats (wired in Admin Panel).</p>
+      </div>
+    </GlassCard>
   );
 };
 
@@ -367,11 +249,7 @@ export const Dashboard: React.FC = () => {
 
   return (
     <div>
-      <motion.div
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="mb-6"
-      >
+      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
         <h1 className="text-2xl font-bold">Dashboard</h1>
         <p className="text-muted-foreground">Overview of your attendance system</p>
       </motion.div>
