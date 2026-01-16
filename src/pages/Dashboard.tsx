@@ -7,7 +7,8 @@ import {
   AlertTriangle,
   Calendar,
   Clock,
-  ChevronRight
+  ChevronRight,
+  Loader2
 } from 'lucide-react';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { AnimatedNumber } from '@/components/ui/AnimatedNumber';
@@ -16,6 +17,7 @@ import { StatusBadge } from '@/components/ui/StatusBadge';
 import { CircularProgress } from '@/components/ui/CircularProgress';
 import { useAuth } from '@/contexts/AuthContext';
 import { api, Subject, StudentStats, Prediction } from '@/lib/api';
+import { toast } from 'sonner';
 
 interface DashboardCard {
   title: string;
@@ -35,15 +37,12 @@ const TeacherDashboard: React.FC = () => {
     const fetchData = async () => {
       setIsLoading(true);
       try {
-        const data = await api.getTeacherSubjects(user?.id || 1);
+        const data = await api.getSubjects();
         setSubjects(data);
       } catch (error) {
-        // Demo data
-        setSubjects([
-          { subject_id: 1, name: 'Machine Learning', class: '3-CSE-A', total_classes: 42 },
-          { subject_id: 2, name: 'Data Structures', class: '2-CSE-B', total_classes: 38 },
-          { subject_id: 3, name: 'Database Systems', class: '3-CSE-A', total_classes: 35 },
-        ]);
+        const message = error instanceof Error ? error.message : 'Failed to fetch subjects';
+        toast.error(message);
+        setSubjects([]);
       } finally {
         setIsLoading(false);
       }
@@ -52,10 +51,8 @@ const TeacherDashboard: React.FC = () => {
   }, [user]);
 
   const cards: DashboardCard[] = [
-    { title: 'Total Classes Today', value: 4, icon: BookOpen, color: 'primary', change: '+2 from yesterday' },
-    { title: 'Students Detected', value: 127, icon: Users, color: 'success', change: '98% accuracy' },
-    { title: 'Avg Attendance', value: 84.5, suffix: '%', icon: TrendingUp, color: 'success', change: '+3.2% this week' },
-    { title: 'At-Risk Students', value: 12, icon: AlertTriangle, color: 'warning', change: 'Below 75%' },
+    { title: 'Total Subjects', value: subjects.length, icon: BookOpen, color: 'primary' },
+    { title: 'Total Classes', value: subjects.reduce((acc, s) => acc + (s.total_classes || 0), 0), icon: Calendar, color: 'success' },
   ];
 
   const containerVariants = {
@@ -86,7 +83,7 @@ const TeacherDashboard: React.FC = () => {
           ? Array.from({ length: 4 }).map((_, i) => (
               <DashboardCardSkeleton key={i} />
             ))
-          : cards.map((card, index) => (
+          : cards.map((card) => (
               <motion.div key={card.title} variants={itemVariants}>
                 <GlassCard className="relative overflow-hidden">
                   <div className="flex justify-between items-start mb-4">
@@ -111,18 +108,28 @@ const TeacherDashboard: React.FC = () => {
             ))}
       </motion.div>
 
-      {/* Recent Classes & Subjects */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <motion.div
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.4 }}
-        >
-          <GlassCard hover={false}>
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-semibold">Your Subjects</h2>
-              <StatusBadge status="info" label={`${subjects.length} Active`} />
+      {/* Subjects List */}
+      <motion.div
+        initial={{ opacity: 0, x: -20 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ delay: 0.4 }}
+      >
+        <GlassCard hover={false}>
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-lg font-semibold">Your Subjects</h2>
+            <StatusBadge status="info" label={`${subjects.length} Active`} />
+          </div>
+          {isLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="w-6 h-6 animate-spin text-primary" />
             </div>
+          ) : subjects.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <BookOpen className="w-12 h-12 mx-auto mb-4 opacity-50" />
+              <p>No subjects found</p>
+              <p className="text-sm">Subjects will appear here once added</p>
+            </div>
+          ) : (
             <div className="space-y-3">
               {subjects.map((subject, index) => (
                 <motion.div
@@ -138,61 +145,19 @@ const TeacherDashboard: React.FC = () => {
                     </div>
                     <div>
                       <p className="font-medium">{subject.name}</p>
-                      <p className="text-sm text-muted-foreground">{subject.class}</p>
+                      <p className="text-sm text-muted-foreground">{subject.class || 'No class assigned'}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="text-sm text-muted-foreground">{subject.total_classes} classes</span>
+                    <span className="text-sm text-muted-foreground">{subject.total_classes || 0} classes</span>
                     <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
                   </div>
                 </motion.div>
               ))}
             </div>
-          </GlassCard>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.5 }}
-        >
-          <GlassCard hover={false}>
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-semibold">Today's Schedule</h2>
-              <Calendar className="w-5 h-5 text-muted-foreground" />
-            </div>
-            <div className="space-y-3">
-              {[
-                { time: '09:00 AM', subject: 'Machine Learning', class: '3-CSE-A', status: 'completed' },
-                { time: '11:00 AM', subject: 'Data Structures', class: '2-CSE-B', status: 'completed' },
-                { time: '02:00 PM', subject: 'Database Systems', class: '3-CSE-A', status: 'ongoing' },
-                { time: '04:00 PM', subject: 'Machine Learning', class: '3-CSE-B', status: 'upcoming' },
-              ].map((schedule, index) => (
-                <motion.div
-                  key={index}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.6 + index * 0.1 }}
-                  className="flex items-center gap-4 p-4 rounded-lg bg-secondary/50"
-                >
-                  <div className="flex items-center gap-2 text-muted-foreground min-w-[90px]">
-                    <Clock className="w-4 h-4" />
-                    <span className="text-sm">{schedule.time}</span>
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-medium">{schedule.subject}</p>
-                    <p className="text-sm text-muted-foreground">{schedule.class}</p>
-                  </div>
-                  <StatusBadge 
-                    status={schedule.status === 'completed' ? 'safe' : schedule.status === 'ongoing' ? 'warning' : 'info'} 
-                    label={schedule.status}
-                  />
-                </motion.div>
-              ))}
-            </div>
-          </GlassCard>
-        </motion.div>
-      </div>
+          )}
+        </GlassCard>
+      </motion.div>
     </div>
   );
 };
@@ -214,9 +179,8 @@ const StudentDashboard: React.FC = () => {
         setStats(statsData);
         setPrediction(predData);
       } catch (error) {
-        // Demo data
-        setStats({ attended: 32, missed: 8, total: 40, percentage: 80 });
-        setPrediction({ classes_needed: 3, risk_level: 'WARNING' });
+        const message = error instanceof Error ? error.message : 'Failed to fetch data';
+        toast.error(message);
       } finally {
         setIsLoading(false);
       }
@@ -232,6 +196,14 @@ const StudentDashboard: React.FC = () => {
       default: return 'warning';
     }
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -268,52 +240,46 @@ const StudentDashboard: React.FC = () => {
         </GlassCard>
       </motion.div>
 
-      {/* Subject-wise Cards */}
+      {/* Stats */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2 }}
+        className="grid grid-cols-1 md:grid-cols-3 gap-4"
       >
-        <h2 className="text-xl font-semibold mb-4">Subject-wise Attendance</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[
-            { name: 'Machine Learning', attended: 18, total: 21, percentage: 85.7 },
-            { name: 'Data Structures', attended: 14, total: 19, percentage: 73.7 },
-            { name: 'Database Systems', attended: 12, total: 15, percentage: 80 },
-          ].map((subject, index) => (
-            <motion.div
-              key={subject.name}
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.3 + index * 0.1 }}
-            >
-              <GlassCard>
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-medium">{subject.name}</h3>
-                  <StatusBadge 
-                    status={subject.percentage >= 80 ? 'safe' : subject.percentage >= 60 ? 'warning' : 'critical'} 
-                    label={`${subject.percentage.toFixed(1)}%`}
-                  />
-                </div>
-                <div className="flex items-center gap-2 mb-3">
-                  <div className="flex-1 h-2 bg-secondary rounded-full overflow-hidden">
-                    <motion.div
-                      initial={{ width: 0 }}
-                      animate={{ width: `${subject.percentage}%` }}
-                      transition={{ delay: 0.5 + index * 0.1, duration: 0.8 }}
-                      className={`h-full rounded-full ${
-                        subject.percentage >= 80 ? 'bg-success' : subject.percentage >= 60 ? 'bg-warning' : 'bg-destructive'
-                      }`}
-                    />
-                  </div>
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  {subject.attended} attended • {subject.total - subject.attended} missed
-                </p>
-              </GlassCard>
-            </motion.div>
-          ))}
-        </div>
+        <GlassCard>
+          <div className="flex items-center gap-4">
+            <div className="p-3 rounded-xl bg-success/10">
+              <TrendingUp className="w-6 h-6 text-success" />
+            </div>
+            <div>
+              <AnimatedNumber value={stats?.attended || 0} className="text-2xl font-bold" />
+              <p className="text-sm text-muted-foreground">Classes Attended</p>
+            </div>
+          </div>
+        </GlassCard>
+        <GlassCard>
+          <div className="flex items-center gap-4">
+            <div className="p-3 rounded-xl bg-destructive/10">
+              <AlertTriangle className="w-6 h-6 text-destructive" />
+            </div>
+            <div>
+              <AnimatedNumber value={stats?.missed || 0} className="text-2xl font-bold" />
+              <p className="text-sm text-muted-foreground">Classes Missed</p>
+            </div>
+          </div>
+        </GlassCard>
+        <GlassCard>
+          <div className="flex items-center gap-4">
+            <div className="p-3 rounded-xl bg-primary/10">
+              <Calendar className="w-6 h-6 text-primary" />
+            </div>
+            <div>
+              <AnimatedNumber value={stats?.total || 0} className="text-2xl font-bold" />
+              <p className="text-sm text-muted-foreground">Total Classes</p>
+            </div>
+          </div>
+        </GlassCard>
       </motion.div>
     </div>
   );
@@ -335,13 +301,8 @@ const AdminDashboard: React.FC = () => {
         const data = await api.getUniversityStats();
         setStats(data);
       } catch (error) {
-        // Demo data
-        setStats({
-          total_students: 1200,
-          total_teachers: 80,
-          average_attendance: 82.4,
-          at_risk_students: 134,
-        });
+        const message = error instanceof Error ? error.message : 'Failed to fetch stats';
+        toast.error(message);
       } finally {
         setIsLoading(false);
       }
@@ -363,26 +324,28 @@ const AdminDashboard: React.FC = () => {
         animate={{ opacity: 1 }}
         className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"
       >
-        {cards.map((card, index) => (
-          <motion.div
-            key={card.title}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.1 }}
-          >
-            <GlassCard>
-              <div className="flex items-center gap-4">
-                <div className={`p-3 rounded-xl bg-${card.color}/10`}>
-                  <card.icon className={`w-6 h-6 text-${card.color}`} />
-                </div>
-                <div>
-                  <AnimatedNumber value={card.value} suffix={card.suffix} className="text-2xl font-bold" />
-                  <p className="text-sm text-muted-foreground">{card.title}</p>
-                </div>
-              </div>
-            </GlassCard>
-          </motion.div>
-        ))}
+        {isLoading
+          ? Array.from({ length: 4 }).map((_, i) => <DashboardCardSkeleton key={i} />)
+          : cards.map((card, index) => (
+              <motion.div
+                key={card.title}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.1 }}
+              >
+                <GlassCard>
+                  <div className="flex items-center gap-4">
+                    <div className={`p-3 rounded-xl bg-${card.color}/10`}>
+                      <card.icon className={`w-6 h-6 text-${card.color}`} />
+                    </div>
+                    <div>
+                      <AnimatedNumber value={card.value} suffix={card.suffix} className="text-2xl font-bold" />
+                      <p className="text-sm text-muted-foreground">{card.title}</p>
+                    </div>
+                  </div>
+                </GlassCard>
+              </motion.div>
+            ))}
       </motion.div>
     </div>
   );

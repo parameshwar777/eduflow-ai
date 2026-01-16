@@ -8,10 +8,10 @@ import {
   BarChart3, 
   Bell, 
   ChevronLeft,
-  ChevronRight,
   Users,
   Building2,
-  GraduationCap
+  GraduationCap,
+  UserPlus
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
@@ -31,6 +31,7 @@ interface NavItem {
 const navItems: NavItem[] = [
   { icon: LayoutDashboard, label: 'Dashboard', path: '/dashboard', roles: ['TEACHER', 'STUDENT', 'ADMIN'] },
   { icon: Camera, label: 'Mark Attendance', path: '/attendance/mark', roles: ['TEACHER'] },
+  { icon: UserPlus, label: 'Student Training', path: '/training', roles: ['TEACHER', 'ADMIN'] },
   { icon: BookOpen, label: 'Subjects', path: '/subjects', roles: ['TEACHER'] },
   { icon: BarChart3, label: 'Analytics', path: '/analytics', roles: ['TEACHER', 'STUDENT', 'ADMIN'] },
   { icon: Bell, label: 'Alerts', path: '/alerts', roles: ['TEACHER', 'STUDENT', 'ADMIN'] },

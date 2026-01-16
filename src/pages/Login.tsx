@@ -2,12 +2,13 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Eye, EyeOff, GraduationCap, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { api, User } from '@/lib/api';
+import { api, decodeJWT, User } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { toast } from 'sonner';
 
 export const LoginPage: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -26,27 +27,27 @@ export const LoginPage: React.FC = () => {
     try {
       const response = await api.login(email, password);
       
-      // Decode JWT to get user info (simplified - in production use proper JWT decode)
-      const user: User = {
-        id: 1,
-        email,
-        role: email.includes('admin') ? 'ADMIN' : email.includes('teacher') ? 'TEACHER' : 'STUDENT',
-        name: email.split('@')[0],
-      };
+      // Decode JWT to get user info
+      const decoded = decodeJWT(response.access_token);
       
-      login(response.access_token, user);
-      navigate('/dashboard');
+      if (decoded) {
+        const user: User = {
+          id: decoded.user_id,
+          email: decoded.sub,
+          role: decoded.role as 'ADMIN' | 'TEACHER' | 'STUDENT',
+          name: decoded.sub.split('@')[0],
+        };
+        
+        login(response.access_token, user);
+        toast.success('Login successful!');
+        navigate('/dashboard');
+      } else {
+        throw new Error('Invalid token received');
+      }
     } catch (err) {
-      setError('Invalid credentials. Please try again.');
-      // Demo mode - allow login anyway
-      const user: User = {
-        id: 1,
-        email,
-        role: email.includes('admin') ? 'ADMIN' : email.includes('teacher') ? 'TEACHER' : 'STUDENT',
-        name: email.split('@')[0],
-      };
-      login('demo_token', user);
-      navigate('/dashboard');
+      const message = err instanceof Error ? err.message : 'Login failed. Please try again.';
+      setError(message);
+      toast.error(message);
     } finally {
       setIsLoading(false);
     }
@@ -100,7 +101,7 @@ export const LoginPage: React.FC = () => {
               <Input
                 id="email"
                 type="email"
-                placeholder="teacher@university.edu"
+                placeholder="your@email.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="bg-secondary border-border focus:border-primary"
@@ -169,7 +170,7 @@ export const LoginPage: React.FC = () => {
             transition={{ delay: 0.7 }}
             className="text-center text-sm text-muted-foreground mt-6"
           >
-            Demo: Use teacher@gmail.com, admin@gmail.com, or student@gmail.com
+            Connect to your backend API at {import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000'}
           </motion.p>
         </GlassCard>
       </motion.div>
