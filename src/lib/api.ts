@@ -224,15 +224,27 @@ export const api = {
     });
   },
 
-  // Student
-  registerStudent: async (roll_no: string, name: string, class_id: number, image: File): Promise<any> => {
+  // Student - API expects query params for text fields and FormData only for image
+  registerStudent: async (
+    roll_no: string,
+    name: string,
+    year: string,
+    branch: string,
+    section: string,
+    image: File
+  ): Promise<any> => {
+    const params = new URLSearchParams({
+      name,
+      roll_no,
+      year,
+      branch,
+      section,
+    });
+    
     const formData = new FormData();
-    formData.append('roll_no', roll_no);
-    formData.append('name', name);
-    formData.append('class_id', String(class_id));
     formData.append('image', image);
 
-    return requestFormData(`${API_BASE_URL}/api/students/register`, formData);
+    return requestFormData(`${API_BASE_URL}/api/students/register?${params.toString()}`, formData);
   },
 
   getStudentStats: async (studentId: number): Promise<StudentStats> => {

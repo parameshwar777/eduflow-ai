@@ -12,25 +12,18 @@ import {
   Pie,
   Cell
 } from 'recharts';
-import { Calendar, TrendingUp, Filter, ChevronDown } from 'lucide-react';
+import { Calendar, TrendingUp, ChevronDown, Loader2 } from 'lucide-react';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { CircularProgress } from '@/components/ui/CircularProgress';
 import { Skeleton } from '@/components/ui/SkeletonLoader';
-import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
-
-interface TrendData {
-  date: string;
-  attendance: number;
-}
-
-interface HeatmapData {
-  [date: string]: 'PRESENT' | 'ABSENT';
-}
+import { api, AttendanceTrend, Subject } from '@/lib/api';
 
 export const Analytics: React.FC = () => {
-  const [trendData, setTrendData] = useState<TrendData[]>([]);
+  const [trendData, setTrendData] = useState<{ date: string; attendance: number }[]>([]);
+  const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [calendarData, setCalendarData] = useState<{ date: string; status: 'PRESENT' | 'ABSENT' | 'HOLIDAY' }[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedSubject, setSelectedSubject] = useState('all');
   const [dateRange, setDateRange] = useState('30d');
@@ -39,52 +32,53 @@ export const Analytics: React.FC = () => {
   useEffect(() => {
     const fetchData = async () => {
       setIsLoading(true);
-      // Demo data
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      const dates = Array.from({ length: 30 }, (_, i) => {
-        const date = new Date();
-        date.setDate(date.getDate() - (29 - i));
-        return date.toISOString().split('T')[0];
-      });
-
-      const demoTrend = dates.map(date => ({
-        date: date.split('-').slice(1).join('/'),
-        attendance: 70 + Math.random() * 25,
-      }));
-
-      setTrendData(demoTrend);
-      setIsLoading(false);
+      try {
+        // Fetch subjects for teacher
+        if (user?.role === 'TEACHER' && user?.id) {
+          const subjectsData = await api.getTeacherSubjects(user.id);
+          setSubjects(subjectsData);
+          
+          // Fetch trend for first subject if available
+          if (subjectsData.length > 0 && selectedSubject !== 'all') {
+            const subjectId = Number(selectedSubject);
+            const trend = await api.getAttendanceTrend(subjectId);
+            const formatted = trend.dates.map((date, i) => ({
+              date: date.split('-').slice(1).join('/'),
+              attendance: trend.attendance[i],
+            }));
+            setTrendData(formatted);
+          }
+        }
+        
+        // Fetch calendar for student
+        if (user?.role === 'STUDENT' && user?.id) {
+          const calendar = await api.getAttendanceCalendar(user.id);
+          const entries = Object.entries(calendar).map(([date, status]) => ({
+            date,
+            status: status as 'PRESENT' | 'ABSENT',
+          }));
+          setCalendarData(entries);
+        }
+      } catch (err) {
+        console.error('Failed to fetch analytics:', err);
+      } finally {
+        setIsLoading(false);
+      }
     };
     fetchData();
-  }, [selectedSubject, dateRange]);
+  }, [user, selectedSubject, dateRange]);
 
-  const pieData = [
-    { name: 'Present', value: 78, color: 'hsl(142, 71%, 45%)' },
-    { name: 'Absent', value: 22, color: 'hsl(0, 72%, 51%)' },
+  // Calculate pie data from trend or calendar
+  const presentCount = calendarData.filter(d => d.status === 'PRESENT').length;
+  const absentCount = calendarData.filter(d => d.status === 'ABSENT').length;
+  const total = presentCount + absentCount;
+  
+  const pieData = total > 0 ? [
+    { name: 'Present', value: Math.round((presentCount / total) * 100), color: 'hsl(142, 71%, 45%)' },
+    { name: 'Absent', value: Math.round((absentCount / total) * 100), color: 'hsl(0, 72%, 51%)' },
+  ] : [
+    { name: 'No Data', value: 100, color: 'hsl(var(--muted))' },
   ];
-
-  const subjectStats = [
-    { name: 'Machine Learning', percentage: 85.7, trend: '+2.3%' },
-    { name: 'Data Structures', percentage: 73.7, trend: '-1.5%' },
-    { name: 'Database Systems', percentage: 80.0, trend: '+0.8%' },
-    { name: 'Computer Networks', percentage: 92.1, trend: '+4.2%' },
-  ];
-
-  const heatmapData: { date: string; status: 'PRESENT' | 'ABSENT' | 'HOLIDAY' }[] = [];
-  for (let i = 0; i < 35; i++) {
-    const date = new Date();
-    date.setDate(date.getDate() - i);
-    const day = date.getDay();
-    if (day === 0 || day === 6) {
-      heatmapData.push({ date: date.toISOString(), status: 'HOLIDAY' });
-    } else {
-      heatmapData.push({ 
-        date: date.toISOString(), 
-        status: Math.random() > 0.2 ? 'PRESENT' : 'ABSENT' 
-      });
-    }
-  }
 
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
@@ -112,19 +106,23 @@ export const Analytics: React.FC = () => {
 
         {/* Filters */}
         <div className="flex gap-3">
-          <div className="relative">
-            <select
-              value={selectedSubject}
-              onChange={(e) => setSelectedSubject(e.target.value)}
-              className="appearance-none bg-secondary px-4 py-2 pr-10 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-            >
-              <option value="all">All Subjects</option>
-              <option value="ml">Machine Learning</option>
-              <option value="ds">Data Structures</option>
-              <option value="db">Database Systems</option>
-            </select>
-            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
-          </div>
+          {subjects.length > 0 && (
+            <div className="relative">
+              <select
+                value={selectedSubject}
+                onChange={(e) => setSelectedSubject(e.target.value)}
+                className="appearance-none bg-secondary px-4 py-2 pr-10 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              >
+                <option value="all">All Subjects</option>
+                {subjects.map((s) => (
+                  <option key={s.subject_id} value={s.subject_id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+            </div>
+          )}
           <div className="relative">
             <select
               value={dateRange}
@@ -154,11 +152,19 @@ export const Analytics: React.FC = () => {
                 <TrendingUp className="w-5 h-5 text-primary" />
                 Attendance Trend
               </h2>
-              <StatusBadge status="safe" label="Improving" />
+              {trendData.length > 0 && <StatusBadge status="safe" label="Live Data" />}
             </div>
             
             {isLoading ? (
               <Skeleton className="h-64 w-full" />
+            ) : trendData.length === 0 ? (
+              <div className="h-64 flex items-center justify-center">
+                <div className="text-center">
+                  <TrendingUp className="w-12 h-12 text-muted-foreground mx-auto mb-4 opacity-50" />
+                  <p className="text-muted-foreground">No trend data available</p>
+                  <p className="text-sm text-muted-foreground">Select a subject to view attendance trends</p>
+                </div>
+              </div>
             ) : (
               <div className="h-64">
                 <ResponsiveContainer width="100%" height="100%">
@@ -240,86 +246,96 @@ export const Analytics: React.FC = () => {
       </div>
 
       {/* Subject-wise Stats */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3 }}
-        className="mb-6"
-      >
-        <GlassCard hover={false}>
-          <h2 className="text-lg font-semibold mb-6">Subject-wise Performance</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {subjectStats.map((subject, index) => (
-              <motion.div
-                key={subject.name}
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.4 + index * 0.1 }}
-                className="p-4 rounded-lg bg-secondary/50 text-center"
-              >
-                <CircularProgress value={subject.percentage} size={80} strokeWidth={6} />
-                <h3 className="font-medium mt-3">{subject.name}</h3>
-                <p className={`text-sm ${subject.trend.startsWith('+') ? 'text-success' : 'text-destructive'}`}>
-                  {subject.trend}
-                </p>
-              </motion.div>
-            ))}
-          </div>
-        </GlassCard>
-      </motion.div>
+      {subjects.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          className="mb-6"
+        >
+          <GlassCard hover={false}>
+            <h2 className="text-lg font-semibold mb-6">Subject-wise Overview</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {subjects.map((subject, index) => (
+                <motion.div
+                  key={subject.subject_id}
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: 0.4 + index * 0.1 }}
+                  className="p-4 rounded-lg bg-secondary/50 text-center"
+                >
+                  <CircularProgress value={75} size={80} strokeWidth={6} />
+                  <h3 className="font-medium mt-3">{subject.name}</h3>
+                  <p className="text-sm text-muted-foreground">{subject.class}</p>
+                  <p className="text-xs text-muted-foreground">{subject.total_classes} classes</p>
+                </motion.div>
+              ))}
+            </div>
+          </GlassCard>
+        </motion.div>
+      )}
 
-      {/* Attendance Calendar Heatmap */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.4 }}
-      >
-        <GlassCard hover={false}>
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-lg font-semibold flex items-center gap-2">
-              <Calendar className="w-5 h-5 text-primary" />
-              Attendance Calendar
-            </h2>
-            <div className="flex gap-4">
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded bg-success" />
-                <span className="text-xs text-muted-foreground">Present</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded bg-destructive" />
-                <span className="text-xs text-muted-foreground">Absent</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded bg-muted" />
-                <span className="text-xs text-muted-foreground">Holiday</span>
+      {/* Attendance Calendar */}
+      {calendarData.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
+        >
+          <GlassCard hover={false}>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-lg font-semibold flex items-center gap-2">
+                <Calendar className="w-5 h-5 text-primary" />
+                Attendance Calendar
+              </h2>
+              <div className="flex gap-4">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded bg-success" />
+                  <span className="text-xs text-muted-foreground">Present</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded bg-destructive" />
+                  <span className="text-xs text-muted-foreground">Absent</span>
+                </div>
               </div>
             </div>
-          </div>
-          
-          <div className="grid grid-cols-7 gap-2">
-            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-              <div key={day} className="text-center text-xs text-muted-foreground font-medium py-2">
-                {day}
-              </div>
-            ))}
-            {heatmapData.reverse().map((day, index) => (
-              <motion.div
-                key={day.date}
-                initial={{ opacity: 0, scale: 0 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.5 + index * 0.02 }}
-                className={`aspect-square rounded-lg flex items-center justify-center text-xs font-medium ${
-                  day.status === 'PRESENT' ? 'bg-success/20 text-success' :
-                  day.status === 'ABSENT' ? 'bg-destructive/20 text-destructive' :
-                  'bg-muted/30 text-muted-foreground'
-                }`}
-              >
-                {new Date(day.date).getDate()}
-              </motion.div>
-            ))}
+            
+            <div className="grid grid-cols-7 gap-2">
+              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                <div key={day} className="text-center text-xs text-muted-foreground font-medium py-2">
+                  {day}
+                </div>
+              ))}
+              {calendarData.slice(0, 35).map((day, index) => (
+                <motion.div
+                  key={day.date}
+                  initial={{ opacity: 0, scale: 0 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: 0.5 + index * 0.02 }}
+                  className={`aspect-square rounded-lg flex items-center justify-center text-xs font-medium ${
+                    day.status === 'PRESENT' ? 'bg-success/20 text-success' :
+                    day.status === 'ABSENT' ? 'bg-destructive/20 text-destructive' :
+                    'bg-muted/30 text-muted-foreground'
+                  }`}
+                >
+                  {new Date(day.date).getDate()}
+                </motion.div>
+              ))}
+            </div>
+          </GlassCard>
+        </motion.div>
+      )}
+
+      {/* Empty state */}
+      {!isLoading && trendData.length === 0 && calendarData.length === 0 && subjects.length === 0 && (
+        <GlassCard hover={false}>
+          <div className="text-center py-12">
+            <TrendingUp className="w-12 h-12 text-muted-foreground mx-auto mb-4 opacity-50" />
+            <p className="text-muted-foreground">No analytics data available</p>
+            <p className="text-sm text-muted-foreground">Data will appear once attendance is tracked</p>
           </div>
         </GlassCard>
-      </motion.div>
+      )}
     </div>
   );
 };
