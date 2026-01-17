@@ -26,7 +26,9 @@ import { toast } from 'sonner';
 interface TrainingForm {
   name: string;
   roll_no: string;
-  class_id: string;
+  year: string;
+  branch: string;
+  section: string;
 }
 
 interface CSVStudent {
@@ -55,7 +57,9 @@ export const StudentTraining: React.FC = () => {
   const [form, setForm] = useState<TrainingForm>({
     name: '',
     roll_no: '',
-    class_id: '',
+    year: '',
+    branch: '',
+    section: '',
   });
 
   // Bulk import state
@@ -156,12 +160,12 @@ export const StudentTraining: React.FC = () => {
   };
 
   const isFormValid = () => {
-    const classIdNum = Number(form.class_id);
     return (
       form.name.trim() &&
       form.roll_no.trim() &&
-      Number.isFinite(classIdNum) &&
-      classIdNum > 0 &&
+      form.year.trim() &&
+      form.branch.trim() &&
+      form.section.trim() &&
       !!capturedFile
     );
   };
@@ -170,20 +174,19 @@ export const StudentTraining: React.FC = () => {
     e.preventDefault();
     if (!capturedFile) return;
 
-    const classIdNum = Number(form.class_id);
     if (!isFormValid()) {
-      toast.error('Please fill Name, Roll No, Class ID, and capture/upload a photo.');
+      toast.error('Please fill all fields and capture/upload a photo.');
       return;
     }
 
     setIsProcessing(true);
     try {
-      await api.registerStudent(form.roll_no, form.name, classIdNum, capturedFile);
+      await api.registerStudent(form.roll_no, form.name, form.year, form.branch, form.section, capturedFile);
       setRegistrationSuccess(true);
       toast.success('Student registered and face embedding saved.');
 
       setTimeout(() => {
-        setForm({ name: '', roll_no: '', class_id: '' });
+        setForm({ name: '', roll_no: '', year: '', branch: '', section: '' });
         resetCapture();
         setRegistrationSuccess(false);
       }, 2500);
