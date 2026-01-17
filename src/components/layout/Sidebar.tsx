@@ -37,6 +37,8 @@ const navItems: NavItem[] = [
   { icon: Bell, label: 'Alerts', path: '/alerts', roles: ['TEACHER', 'STUDENT', 'ADMIN'] },
   { icon: Users, label: 'Students', path: '/admin/students', roles: ['ADMIN'] },
   { icon: Building2, label: 'Departments', path: '/admin/departments', roles: ['ADMIN'] },
+  { icon: GraduationCap, label: 'Classes', path: '/admin/classes', roles: ['ADMIN'] },
+  { icon: Users, label: 'Teachers', path: '/admin/teachers', roles: ['ADMIN'] },
 ];
 
 export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggle }) => {
