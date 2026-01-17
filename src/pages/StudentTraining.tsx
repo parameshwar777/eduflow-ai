@@ -402,17 +402,40 @@ export const StudentTraining: React.FC = () => {
                     />
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="class">Class ID</Label>
-                    <Input
-                      id="class"
-                      inputMode="numeric"
-                      placeholder="e.g., 3"
-                      value={form.class_id}
-                      onChange={(e) => setForm((p) => ({ ...p, class_id: e.target.value }))}
-                      className="bg-secondary border-border"
-                      required
-                    />
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="year">Year</Label>
+                      <Input
+                        id="year"
+                        placeholder="e.g., 3"
+                        value={form.year}
+                        onChange={(e) => setForm((p) => ({ ...p, year: e.target.value }))}
+                        className="bg-secondary border-border"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="branch">Branch</Label>
+                      <Input
+                        id="branch"
+                        placeholder="CSE"
+                        value={form.branch}
+                        onChange={(e) => setForm((p) => ({ ...p, branch: e.target.value }))}
+                        className="bg-secondary border-border"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="section">Section</Label>
+                      <Input
+                        id="section"
+                        placeholder="A"
+                        value={form.section}
+                        onChange={(e) => setForm((p) => ({ ...p, section: e.target.value }))}
+                        className="bg-secondary border-border"
+                        required
+                      />
+                    </div>
                   </div>
 
                   <AnimatePresence mode="wait">
